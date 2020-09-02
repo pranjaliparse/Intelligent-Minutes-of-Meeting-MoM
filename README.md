@@ -1,0 +1,2 @@
+# Intelligent-Minutes-of-Meeting-MoM-
+With everyone across the organization working remotely due to the COVID-19 outbreak, virtual platforms are the new medium to connect and interact.    Develop an AI-enabled tool to tag multiple speakers from a pre-recorded meeting audio and generate the transcript along with generating the MoM summary.   The goal is to reduce the effort of manual MoM preparation to the maximum extent possible. 

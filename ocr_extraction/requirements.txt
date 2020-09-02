@@ -1,0 +1,9 @@
+# Function dependencies, for example:
+# package>=version
+
+google-cloud-videointelligence
+google-cloud-vision
+google-cloud-storage
+SpeechRecognition
+firebase_admin
+opencv-python

@@ -74,7 +74,7 @@ def transcribe_video_pipeline(event, context):
         None; the output is written to Stackdriver Logging
     """
 
-    print("Started Keyword Extraction..")
+    print("\nStarted Keyword Extraction..")
     print('Event ID: {}'.format(context.event_id))
     print('Event type: {}'.format(context.event_type))
     print('Bucket: {}'.format(event['bucket']))

@@ -11,14 +11,15 @@ from firebase_admin import credentials
 from firebase_admin import storage
 import urllib.request as req
 
-creds_path  = "balance-265606-c6d8d37d987d.json" # Credentials
+creds_path  = "balance-265606-c6d8d37d987d.json" 
+# Credentials
 
 def read_data_from_storage(bucket_name, file_name):
     """Reads a file from Cloud Storage."""
     # bucket_name = "your-bucket-name"
     # file_name = "path-to-the-file-name"
 
-    storage_client = storage.Client()
+    storage_client = st.Client()
     bucket = storage_client.get_bucket(bucket_name)
     blob = bucket.blob(file_name)
     blob = blob.download_as_string()
@@ -54,7 +55,7 @@ def upload_blob(source_bucket_name, source_file_name, destination_blob_name):
     # source_file_name = "local/path/to/file"
     # destination_blob_name = "storage-object-name"
  
-    storage_client = storage.Client()
+    storage_client = st.Client()
     bucket = storage_client.bucket(source_bucket_name)
     blob = bucket.blob(destination_blob_name)
     blob.upload_from_filename(source_file_name)

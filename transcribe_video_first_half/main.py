@@ -1,20 +1,27 @@
+import json
+import cv2
+import csv
+import datetime
+import firebase_admin
+import urllib.request as req
 from google.cloud import videointelligence
 from google.cloud import storage as st
-import json
-from google.cloud.videointelligence import enums, types
-import cv2
-import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import storage
-import urllib.request as req
-import datetime
+from webvtt import WebVTT, Caption
+from google.cloud.videointelligence import enums, types
 
-creds_path = "balance-265606-c6d8d37d987d.json"
+
+creds_path  = "balance-265606-c6d8d37d987d.json" 
+# Credentials
+
 # Generate Signed URL
 def generate_signed_url(file_path):
+    """Generate a signed URL from gcp uri"""
+    # file_path = "your-gcp-file-path"
     cred = credentials.Certificate(creds_path)
     file_name = file_path.split("/")[-1]
-    app = firebase_admin.initialize_app(cred, {'storageBucket': 'balance_bucket'}, name = file_name)
+    app = firebase_admin.initialize_app(cred, {'storageBucket': 'balance_bucket'}, name = file_name+"1")
     bucket = storage.bucket(app=app)
 
     def generate_image_url(blob_path):
@@ -25,31 +32,30 @@ def generate_signed_url(file_path):
         blob = bucket.blob(blob_path) 
         return blob.generate_signed_url(datetime.timedelta(seconds=300), method='GET')
 
-
     url = generate_image_url(file_name)
+    print("Generated a signed URL..")
     return url
 
 
-# Function that takes input as milliseconds and returns the timestamp
+
 def milliseconds(target_date_time_ms):
-    base_datetime = datetime.datetime( 1970, 1, 1 )
-    delta = datetime.timedelta( 0, 0, 0, target_date_time_ms )
-    target_date = base_datetime + delta
-    return(str(target_date).split()[1][:8])
+  base_datetime = datetime.datetime( 1970, 1, 1 )
+  delta = datetime.timedelta( 0, 0, 0, target_date_time_ms )
+  target_date = base_datetime + delta
+  return(str(target_date).split()[1][:12])
 
 
-def upload_blob(bucket_name, source_file_name, destination_blob_name):
+
+def upload_blob(source_bucket_name, source_file_name, destination_blob_name):
     """Uploads a file to the bucket."""
     # bucket_name = "your-bucket-name"
     # source_file_name = "local/path/to/file"
     # destination_blob_name = "storage-object-name"
-
+ 
     storage_client = st.Client()
-    bucket = storage_client.bucket(bucket_name)
+    bucket = storage_client.bucket(source_bucket_name)
     blob = bucket.blob(destination_blob_name)
-
     blob.upload_from_filename(source_file_name)
-
     print(
         "File {} uploaded to {}.".format(
             source_file_name, destination_blob_name
@@ -57,52 +63,156 @@ def upload_blob(bucket_name, source_file_name, destination_blob_name):
     )
 
 
-
-# Function for transcribing videos
 def transcribe_videosegments(path, segments = None):
-  start = datetime.datetime.now() # Start time
+    """
+    Video-to-Text for segments of videos.
+    Example:
+    segment = types.VideoSegment()
+    segment.start_time_offset.FromSeconds(0)
+    segment.end_time_offset.FromSeconds(int(duration//2)-300)
+    """
+    # path = "your-file-path"
+    # segments = "video-segments"
 
-  timestamp_dict = dict() # Timestamp dictionary for storing text per timestamp
-  final_text = "" # Transcribed text
+    start = datetime.datetime.now() # Start time
+    video_client = videointelligence.VideoIntelligenceServiceClient()
+    features = [videointelligence.enums.Feature.SPEECH_TRANSCRIPTION]
+    config = videointelligence.types.SpeechTranscriptionConfig(
+        language_code="en-US", enable_automatic_punctuation=True,
+        enable_speaker_diarization = True
+    )
 
-  video_client = videointelligence.VideoIntelligenceServiceClient()
-  features = [videointelligence.enums.Feature.SPEECH_TRANSCRIPTION]
+    video_context = videointelligence.types.VideoContext(
+        segments=segments,
+        speech_transcription_config=config
 
-  config = videointelligence.types.SpeechTranscriptionConfig(
-      language_code="en-US", enable_automatic_punctuation=True
-  )
-  video_context = videointelligence.types.VideoContext(
-      segments=segments,
-      speech_transcription_config=config
-  )
+    )
 
-  operation = video_client.annotate_video(
-      input_uri=path, features=features, video_context=video_context
-  )
+    operation = video_client.annotate_video(
+        input_uri=path, features=features, video_context=video_context
+    )
 
-  print("\nProcessing video for speech transcription.")
+    print("\nProcessing video for speech transcription.")
+    result = operation.result(timeout=800)
+    # There is only one annotation_result since only
+    # one video is processed.
 
-  result = operation.result(timeout=800)
-  # There is only one annotation_result since only
-  # one video is processed.
-  annotation_results = result.annotation_results[0]
-  print("Finished processing..")
+    annotation_results = result.annotation_results[0]
+    speech_transcription_with_speakertag = annotation_results.speech_transcriptions[-1]
+    print("Finished processing..")
+    print("Time taken for transcribing: ",datetime.datetime.now()-start)
 
-  for speech_transcription in annotation_results.speech_transcriptions:
+    return (result, speech_transcription_with_speakertag)
 
+
+def subtitle_generation(response, bin_size=3):
+    """We define a bin of time period to display the words in sync with audio. 
+    Here, bin_size = 3 means each bin is of 3 secs. 
+    All the words in the interval of 3 secs in result will be grouped togather."""
+    # response = "videoIntelligence-response-to-API"
+
+    transcribed_text = ""
+    index = 0
+    vtt = WebVTT()
+
+    for speech_transcription in response.annotation_results[0].speech_transcriptions:
       # The number of alternatives for each transcription is limited by
       # SpeechTranscriptionConfig.max_alternatives.
       # Each alternative is a different possible transcription
       # and has its own confidence score.
       for alternative in speech_transcription.alternatives:
-            if len(alternative.words)>0:
-                time_stamp = milliseconds(alternative.words[0].start_time.seconds * 1e3 + alternative.words[0].start_time.nanos * 1e-6)
-                #print(time_stamp,"{}".format(alternative.transcript))
-                timestamp_dict[time_stamp] = alternative.transcript
-                final_text += alternative.transcript + "\n"
+        try:
+            if alternative.words[0].start_time.seconds:
+                # bin start -> for first word of result
+                start_sec = alternative.words[0].start_time.seconds 
+                start_microsec = alternative.words[0].start_time.nanos * 0.001
+            else:
+                # bin start -> For First word of response
+                start_sec = 0
+                start_microsec = 0 
+            end_sec = start_sec + bin_size # bin end sec
+            
+            # for last word of result
+            last_word_end_sec = alternative.words[-1].end_time.seconds
+            last_word_end_microsec = alternative.words[-1].end_time.nanos * 0.001
+            
+            # bin transcript
+            transcript = alternative.words[0].word
+            
+            index += 1 # subtitle index
 
-  print("Time taken for transcribing: ",datetime.datetime.now()-start)
-  return (final_text, timestamp_dict)
+            for i in range(len(alternative.words) - 1):
+                try:
+                    word = alternative.words[i + 1].word
+                    word_start_sec = alternative.words[i + 1].start_time.seconds
+                    word_start_microsec = alternative.words[i + 1].start_time.nanos * 0.001 # 0.001 to convert nana -> micro
+                    word_end_sec = alternative.words[i + 1].end_time.seconds
+                    word_end_microsec = alternative.words[i + 1].end_time.nanos * 0.001
+
+                    if word_end_sec < end_sec and not('!' in alternative.words[i].word or '?' in alternative.words[i].word or '.' in alternative.words[i].word):
+                        transcript = transcript + " " + word
+                    else:
+                        previous_word_end_sec = alternative.words[i].end_time.seconds
+                        previous_word_end_microsec = alternative.words[i].end_time.nanos * 0.001
+                        
+                        # append bin transcript
+                        start = str(datetime.timedelta(0, start_sec, start_microsec))[:12]
+                        end = str(datetime.timedelta(0, previous_word_end_sec, previous_word_end_microsec))[:12]
+                        if len(start)<=8: start += ".000"
+                        if len(end)<=8: end += ".000"
+                        caption = Caption(start, end, transcript)
+                        transcribed_text += transcript + " "
+                        vtt.captions.append(caption)
+                        
+                        # reset bin parameters
+                        start_sec = word_start_sec
+                        start_microsec = word_start_microsec
+                        end_sec = start_sec + bin_size
+                        transcript = alternative.words[i + 1].word
+                        
+                        index += 1
+                except IndexError:
+                    pass
+            # append transcript of last transcript in bin
+            start = str(datetime.timedelta(0, start_sec, start_microsec))
+            end = str(datetime.timedelta(0, last_word_end_sec, last_word_end_microsec))
+            if len(start)<=8: start += ".000"
+            if len(end)<=8: end += ".000"
+            caption = Caption(start, end, transcript)
+            vtt.captions.append(caption)
+            index += 1
+        except IndexError:
+            pass
+    
+    # turn transcription list into subtitles
+    return (transcribed_text, vtt)
+
+ 
+
+def upload_csv(speech_transcription_with_speakertag, file_name):
+    speakertag = dict()
+    prev = None
+
+    with open('/tmp/{file_name}'.format(file_name = file_name), 'wt') as out_file:
+        tsv_writer = csv.writer(out_file, delimiter='\t')
+        for word in speech_transcription_with_speakertag.alternatives[0].words:
+            if word.speaker_tag not in speakertag:
+                speakertag[word.speaker_tag] = [-1, ""]
+            start = milliseconds(word.start_time.seconds * 1e3 + word.start_time.nanos * 1e-6)
+            if len(start)<=8: start += ".000"
+            speakertag[word.speaker_tag][0] = start
+            speakertag[word.speaker_tag][1] += word.word + " "
+
+            if prev and speakertag[prev][1] and prev!=word.speaker_tag:
+                tsv_writer.writerow([speakertag[prev][0], "Speaker {tag}".format(tag = prev), "{text}\n".format(text = speakertag[prev][1])])
+                # print("{time}: Speaker {tag}: {text}\n".format(time = speakertag[prev][0], tag = prev, text = speakertag[prev][1]))
+                speakertag[prev] = [-1, ""]  
+
+            prev = word.speaker_tag
+    
+    upload_blob("transcribe_video_first_half", '/tmp/{file_name}'.format(file_name = file_name), '{file_name}'.format(file_name = file_name))
+
+
 
 def transcribe_video_pipeline(event, context):
     """Background Cloud Function to be triggered by Cloud Storage.
@@ -138,16 +248,20 @@ def transcribe_video_pipeline(event, context):
     segment = types.VideoSegment()
     segment.start_time_offset.FromSeconds(0)
     segment.end_time_offset.FromSeconds(int(duration//2)-300)
-    transcribed_text, timestamp_dict = transcribe_videosegments(file_path, segments = [segment])
+    
+    result, speech_transcription_with_speakertag = transcribe_videosegments(file_path, segments = [segment])
+    transcribed_text, vtt = subtitle_generation(result, 4)
+    with open("/tmp/{file_name}_subtitles.vtt".format(file_name = event['name'][:-4]), "w") as fd:
+        vtt.write(fd)
+    upload_blob("transcribe_video_first_half", '/tmp/{file_name}_subtitles.vtt'.format(file_name = event['name'][:-4]), '{file_name}_subtitles.vtt'.format(file_name = event['name'][:-4]))
+
+    upload_csv(speech_transcription_with_speakertag, '{file_name}.tsv'.format(file_name = event['name'][:-4]))
 
     write_data = {}
     write_data['video_file_path'] = file_path
     write_data['transcribed_text'] = transcribed_text
-    write_data['timestamp_dict'] = timestamp_dict
 
     with open('/tmp/{file_name}.txt'.format(file_name = event['name'][:-4]), 'w') as outfile:
         json.dump(write_data, outfile)
-    
     upload_blob("transcribe_video_first_half", '/tmp/{file_name}.txt'.format(file_name = event['name'][:-4]), '{file_name}.txt'.format(file_name = event['name'][:-4]))
-
     

@@ -113,13 +113,24 @@ def detect_shot_changes(path):
     for i, shot in enumerate(result.annotation_results[0].shot_annotations):
         start_time = shot.start_time_offset.seconds + shot.start_time_offset.nanos / 1e9
         end_time = shot.end_time_offset.seconds + shot.end_time_offset.nanos / 1e9
+<<<<<<< Updated upstream
         if int(start_time+1)*1000 not in shot_changes: shot_changes.append(int(start_time+1)*1000)
+=======
+<<<<<<< Updated upstream
+        if int(start_time+1)*1000 not in shot_changes:
+            shot_changes.append(int(start_time+1)*1000)
+        # print("\tShot {}: {} to {}".format(i, start_time, end_time))
+>>>>>>> Stashed changes
 
+=======
+        if int(start_time+1)*1000 not in shot_changes: shot_changes.append(int(start_time+1)*1000)
+    
+>>>>>>> Stashed changes
     print("Time taken for detecting shot changes:", datetime.datetime.now()-start)
     if len(shot_changes)>4: shot_changes = shot_changes[5:]
     return shot_changes
 
-  
+'''
 def extract_frames(shot_changes, file_path):
     """Extracting frames from videos on extracted shot changes"""
     # shot_changes = "shot-changes-extracted-from-your-video"
@@ -144,7 +155,14 @@ def extract_frames(shot_changes, file_path):
     cap.release()
     print("Time taken for OCR", datetime.datetime.now()-start)
     return final_text
+<<<<<<< Updated upstream
     
+=======
+<<<<<<< Updated upstream
+=======
+'''    
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 
 def transcribe_video_pipeline(event, context):
     """Background Cloud Function to be triggered by Cloud Storage.
@@ -174,12 +192,22 @@ def transcribe_video_pipeline(event, context):
     write_data = json.loads(read_data_from_storage(event['bucket'], event['name']))
     video_file_path = write_data['video_file_path']
 
+<<<<<<< Updated upstream
     # Detect shot changes
+=======
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
     shot_changes = detect_shot_changes(video_file_path)
     write_data['ocr_text'] = extract_frames(shot_changes, video_file_path)
+=======
+    # Detect shot changes
+    write_data['shot_changes'] = detect_shot_changes(video_file_path)
+    # write_data['ocr_text'] = extract_frames(shot_changes, video_file_path)
+
+>>>>>>> Stashed changes
 
     with open('/tmp/{file_name}'.format(file_name = event['name']), 'w') as outfile:
         json.dump(write_data, outfile)
     
     upload_blob("ocr_videos_bucket", '/tmp/{file_name}'.format(file_name = event['name']), '{file_name}'.format(file_name = event['name']))
- 
+

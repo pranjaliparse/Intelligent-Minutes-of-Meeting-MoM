@@ -105,7 +105,7 @@ def transcribe_videosegments(path, segments = None):
     return (result, speech_transcription_with_speakertag)
 
 
-def subtitle_generation(response, bin_size=3):
+def subtitle_generation(response, vtt, bin_size=3):
     """We define a bin of time period to display the words in sync with audio. 
     Here, bin_size = 3 means each bin is of 3 secs. 
     All the words in the interval of 3 secs in result will be grouped togather."""
@@ -113,7 +113,7 @@ def subtitle_generation(response, bin_size=3):
 
     transcribed_text = ""
     index = 0
-    vtt = WebVTT()
+    flag = None
 
     for speech_transcription in response.annotation_results[0].speech_transcriptions:
       # The number of alternatives for each transcription is limited by
@@ -160,6 +160,8 @@ def subtitle_generation(response, bin_size=3):
                         end = str(datetime.timedelta(0, previous_word_end_sec, previous_word_end_microsec))[:12]
                         if len(start)<=8: start += ".000"
                         if len(end)<=8: end += ".000"
+                        if flag and flag == start: break
+                        if not(flag): flag = start
                         caption = Caption(start, end, transcript)
                         transcribed_text += transcript + " "
                         vtt.captions.append(caption)
@@ -169,15 +171,16 @@ def subtitle_generation(response, bin_size=3):
                         start_microsec = word_start_microsec
                         end_sec = start_sec + bin_size
                         transcript = alternative.words[i + 1].word
-                        
                         index += 1
                 except IndexError:
                     pass
             # append transcript of last transcript in bin
-            start = str(datetime.timedelta(0, start_sec, start_microsec))
-            end = str(datetime.timedelta(0, last_word_end_sec, last_word_end_microsec))
+            start = str(datetime.timedelta(0, start_sec, start_microsec))[:12]
+            end = str(datetime.timedelta(0, last_word_end_sec, last_word_end_microsec))[:12]
             if len(start)<=8: start += ".000"
             if len(end)<=8: end += ".000"
+            if flag and flag == start: break
+            if not(flag): flag = start
             caption = Caption(start, end, transcript)
             vtt.captions.append(caption)
             index += 1
@@ -242,15 +245,16 @@ def transcribe_video_pipeline(event, context):
     cap = cv2.VideoCapture(generate_signed_url(file_path))
     fps = cap.get(cv2.CAP_PROP_FPS)      # OpenCV2 version 2 used "CV_CAP_PROP_FPS"
     frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    duration = frame_count/fps
+    if fps!=0 and frame_count!=0: duration = frame_count/fps
+    else: duration = 3200
     print(duration)
     
     segment = types.VideoSegment()
     segment.start_time_offset.FromSeconds(0)
-    segment.end_time_offset.FromSeconds(int(duration//2)-300)
+    segment.end_time_offset.FromSeconds(int(duration//2))
     
     result, speech_transcription_with_speakertag = transcribe_videosegments(file_path, segments = [segment])
-    transcribed_text, vtt = subtitle_generation(result, 4)
+    transcribed_text, vtt = subtitle_generation(result, WebVTT(), 4)
     with open("/tmp/{file_name}_subtitles.vtt".format(file_name = event['name'][:-4]), "w") as fd:
         vtt.write(fd)
     upload_blob("transcribe_video_first_half", '/tmp/{file_name}_subtitles.vtt'.format(file_name = event['name'][:-4]), '{file_name}_subtitles.vtt'.format(file_name = event['name'][:-4]))

@@ -114,6 +114,7 @@ def detect_shot_changes(path):
         start_time = shot.start_time_offset.seconds + shot.start_time_offset.nanos / 1e9
         end_time = shot.end_time_offset.seconds + shot.end_time_offset.nanos / 1e9
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         if int(start_time+1)*1000 not in shot_changes: shot_changes.append(int(start_time+1)*1000)
 =======
 <<<<<<< Updated upstream
@@ -122,6 +123,10 @@ def detect_shot_changes(path):
         # print("\tShot {}: {} to {}".format(i, start_time, end_time))
 >>>>>>> Stashed changes
 
+=======
+        if int(start_time+1)*1000 not in shot_changes: shot_changes.append(int(start_time+1)*1000)
+    
+>>>>>>> Stashed changes
 =======
         if int(start_time+1)*1000 not in shot_changes: shot_changes.append(int(start_time+1)*1000)
     
@@ -156,12 +161,16 @@ def extract_frames(shot_changes, file_path):
     print("Time taken for OCR", datetime.datetime.now()-start)
     return final_text
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     
 =======
 <<<<<<< Updated upstream
 =======
 '''    
 >>>>>>> Stashed changes
+>>>>>>> Stashed changes
+=======
+'''    
 >>>>>>> Stashed changes
 
 def transcribe_video_pipeline(event, context):
@@ -193,6 +202,7 @@ def transcribe_video_pipeline(event, context):
     video_file_path = write_data['video_file_path']
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     # Detect shot changes
 =======
 <<<<<<< Updated upstream
@@ -200,10 +210,15 @@ def transcribe_video_pipeline(event, context):
     shot_changes = detect_shot_changes(video_file_path)
     write_data['ocr_text'] = extract_frames(shot_changes, video_file_path)
 =======
+=======
+>>>>>>> Stashed changes
     # Detect shot changes
     write_data['shot_changes'] = detect_shot_changes(video_file_path)
     # write_data['ocr_text'] = extract_frames(shot_changes, video_file_path)
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 
     with open('/tmp/{file_name}'.format(file_name = event['name']), 'w') as outfile:

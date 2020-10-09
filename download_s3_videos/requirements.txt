@@ -1,0 +1,6 @@
+# Function dependencies, for example:
+# package>=version
+requests-aws4auth==1.0
+requests==2.20.0
+google-cloud-storage
+google-cloud-secret-manager>=2.0.0

@@ -1,0 +1,5 @@
+# Function dependencies, for example:
+# package>=version
+boto>=2.49.0
+google-cloud-storage
+google-cloud-secret-manager>=2.0.0
